@@ -1,4 +1,6 @@
-export const getGridData = async() => {
+import { FetchParams } from "../stores/GridStore";
+
+export const getGridData = async({filter = "", filterKey = null, pageNumber = 1, recordsPerPage = 10}  :FetchParams) => {
   const response = await fetch('data.json' ,{
     headers : { 
       'Content-Type': 'application/json',
@@ -6,10 +8,23 @@ export const getGridData = async() => {
      }
   });
   const gridData = await response.json();
-  return  processData(gridData);
+
+  // Filtering records
+  if (filter && filter.length > 0) {
+    gridData.results = gridData.results.filter(result => result[filterKey!].contains(filter));
+  }
+
+  // Paginating
+  const startingRecord = (pageNumber - 1) * recordsPerPage;
+  gridData.results = gridData.results.slice(startingRecord, startingRecord + recordsPerPage);
+
+  gridData.pageTotal = recordsPerPage;
+  gridData.pageNumber = pageNumber;
+
+  return processData(gridData);
 }
 
-function processData({results, columns, pageTotal, total}) {
+function processData({results, columns, pageTotal, total, pageNumber}) {
     const rows = results.map((row: any) => {
         return {
             docId: row.document.docId,
@@ -33,7 +48,9 @@ function processData({results, columns, pageTotal, total}) {
     }
 
     columnsOrder = columnsOrder.filter(column => column);
-    return {
-      rows, columnsOrder, columns, pageTotal, total 
+    const data = {
+      rows, columnsOrder, columns, pageTotal, total, pageNumber 
     }
+    console.log(data);
+    return data;
 }

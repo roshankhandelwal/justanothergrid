@@ -1,17 +1,32 @@
-import { action, computed, makeObservable, observable } from "mobx";
+import { action, computed, makeObservable, observable, runInAction } from "mobx";
 import { arrayMoveMutable } from 'array-move';
+import { getGridData } from "../services/dataService";
 
 interface GridData {
     rows: Array<any>,
     columnsOrder: Array<string>,
     columns: {},
     pageTotal: number,
-    total: number
+    total: number,
+    pageNumber: number
 }
 
 interface SortOrder {
     colKey: string,
     order: number
+}
+
+interface PageDetails {
+    pageNum: number,
+    countPerPage: number,
+    totalCount: number
+}
+
+export interface FetchParams {
+    filter?: string, 
+    filterKey?: string | null, 
+    pageNumber?: number, 
+    recordsPerPage?: number
 }
 
 const GridStore = () => {
@@ -24,13 +39,29 @@ const GridStore = () => {
         populated: false,
         // sortOrders: [] as Array<SortOrder>,
         sortOrder: {} as SortOrder,
+        paginationObj: {} as PageDetails,
 
-        setData(data: GridData) {
-            this.rows = data.rows;
-            this.columnsOrder = data.columnsOrder;
-            this.columns = data.columns;
-            this.pageTotal = data.pageTotal;
-            this.total = data.total;
+        fetchParams: {} as FetchParams,
+
+        async getData(params: FetchParams) {
+            this.populated = false;
+            this.fetchParams = {...this.fetchParams, ...params};
+            const {rows, columnsOrder, columns, pageTotal, total, pageNumber} = 
+                await getGridData(this.fetchParams);
+
+            this.setData({rows, columnsOrder, columns, pageTotal, total, pageNumber});
+        },
+
+        setData({rows, columnsOrder, columns, pageTotal, total, pageNumber}: GridData) {
+            this.rows = rows;
+            this.columnsOrder = columnsOrder;
+            this.columns = columns;
+
+            this.paginationObj.countPerPage = pageTotal;
+            this.paginationObj.totalCount = total;
+            this.paginationObj.pageNum = pageNumber;
+
+            this.populated = true;
         },
     
         get gridRows() : Array<any>{
@@ -47,6 +78,10 @@ const GridStore = () => {
 
         get isPopulated() {
             return this.populated;
+        },
+
+        get gridSortOrder() {
+            return this.sortOrder ?? {};
         },
 
         setIsPopulated(status) {
@@ -68,10 +103,6 @@ const GridStore = () => {
             }
             this.sortOrder = {colKey, order : newOrder};
             this.sortData(this.sortOrder.colKey, newOrder);
-        },
-
-        get gridSortOrder() {
-            return this.sortOrder ?? {};
         },
 
         sortData(colKey: string, order: number) {
@@ -100,7 +131,9 @@ const GridStore = () => {
         columnsOrder: observable,
         populated: observable,
         sortOrder: observable,
+        paginationObj: observable,
         
+        getData: action,
         setData: action,
         setIsPopulated: action,
         updateGridColsOrder: action,
